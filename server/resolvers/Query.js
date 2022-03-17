@@ -24,8 +24,8 @@ const Query = {
                 }
             }
 
-            let accessToken = await jwt.sign(payload, process.env.ACCESS_TOKEN)
-            const refreshToken = await jwt.sign(payload, process.env.REFRESH_TOKEN)
+            let accessToken = await jwt.sign(payload, process.env.ACCESS_TOKEN,{expiresIn :"1m"})
+            const refreshToken = await jwt.sign(payload, process.env.REFRESH_TOKEN,{expiresIn :"30m"})
 
             accessToken = `Bearer ${accessToken}`
             user = await User.findOne({ email }).select('-password')
@@ -46,9 +46,10 @@ const Query = {
     },
 
     // books: async (_, args, { dataSources }) => {
-        books: async (_, args, {books, starwars }) => {
+        books: async (_, args, {books, starwars, user}) => {
 
         // console.log(ctx);
+         console.log(user);
 
         try {
             // let { books, starwars } = dataSources

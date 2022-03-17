@@ -4,6 +4,7 @@ const Book = require('./Books')
 const Mutation = require('./Mutation')
 const Important = require('./Important')
 const SearchResult = require('./SearchResult')
+const dateScalar = require('./typeDefs')
 const {
     GraphQLUpload,
   } = require('graphql-upload');
@@ -16,6 +17,7 @@ const resolvers = {
     Important,
     SearchResult,
     Upload: GraphQLUpload,
+    Date: dateScalar
 }
 
 module.exports= resolvers

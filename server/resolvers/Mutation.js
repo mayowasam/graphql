@@ -20,8 +20,8 @@ const Mutation = {
                 }
             }
 
-            let accessToken = await jwt.sign(payload, process.env.ACCESS_TOKEN)
-            const refreshToken = await jwt.sign(payload, process.env.REFRESH_TOKEN)
+            let accessToken = await jwt.sign(payload, process.env.ACCESS_TOKEN,{expiresIn :"2m"})
+            const refreshToken = await jwt.sign(payload, process.env.REFRESH_TOKEN,{expiresIn :"30m"})
 
             accessToken = `Bearer ${accessToken}`
             user = await User.findOne({ email }).select('-password')
