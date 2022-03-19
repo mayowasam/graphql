@@ -1,5 +1,5 @@
 const { mapSchema, getDirective, MapperKind } = require('@graphql-tools/utils');
-const { ApolloError } = require('apollo-server-core');
+const { AuthenticationError } = require('apollo-server-core');
 const { defaultFieldResolver } = require('graphql');
 
 
@@ -73,7 +73,7 @@ function authDirectiveTransformer(schema, directiveName) {
                         return result;
 
                     } else {
-                        throw new ApolloError("user is not authenticated")
+                        throw new AuthenticationError("User is not authenticated")
                     }
                 }
                 // return fieldConfig;

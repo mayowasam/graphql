@@ -1,56 +1,36 @@
-import { ApolloClient, ApolloProvider, createHttpLink, InMemoryCache } from '@apollo/client';
-import { createUploadLink} from 'apollo-upload-client';
-import {BrowserRouter as Router,Routes, Route} from 'react-router-dom'
-
-import { setContext } from '@apollo/client/link/context';
-import Home from './components/Home';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
+import Home from './Pages/Home';
 import Important from './components/Important';
-
-// const link = createHttpLink({
-//   // uri: '/graphql',
-//   uri: 'http://localhost:4000',
-//   // credentials: 'same-origin'
-// });
-
-const link = createUploadLink({
-  // uri: '/graphql',
-  uri: 'http://localhost:4000',
-  // credentials: 'same-origin'
-});
-
-const authLink = setContext((_, { headers }) => {
-  // get the authentication token from local storage if it exists
-  const token = localStorage.getItem('token');
-  // return the headers to the context so httpLink can read them
-  return {
-    headers: {
-      ...headers,
-      authorization: token ? `Bearer ${token}` : "",
-    }
-  }
-
-});
-const client = new ApolloClient({
-  cache: new InMemoryCache(),
-  // link,
-  link: authLink.concat(link),
-});
-
+import Landing from './Pages/Landing';
+import LoginForm from './components/LoginForm';
 
 
 function App() {
+  const logout =() => {
+    localStorage.removeItem("accessToken")
+  }
   return (
     <div className="App">
-      <ApolloProvider client={client}>
-        <Router>
+     
+      <Router>
+      <nav>
+        <ul>
+          <li><Link to="/">App</Link></li>
+          <li><Link to="/home">home</Link></li>
+          <li><Link to="/login">Login</Link></li>
+          <li><Link to="/about">About</Link></li>
+          <li><button onClick={logout}>Logout</button></li>
+        </ul>
+      </nav>
         <Routes>
-        <Route path="/" element={<Home/>} />
-        <Route path="about" element={<Important/>} />
+        <Route path="/" element={<Landing/>} />
+        <Route path="home" element={<Home />} />
+        <Route path="about" element={<Important />} />
+        <Route path="login" element={<LoginForm />} />
         </Routes>
-        </Router>
-       
-        
-      </ApolloProvider>
+      </Router>
+
+
     </div>
   );
 }

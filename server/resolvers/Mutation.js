@@ -1,12 +1,12 @@
 const { finished } = require('stream/promises');
 const { join, parse } = require("path");
-const { ApolloError } = require('apollo-server-core');
+const { ApolloError, UserInputError, ForbiddenError, AuthenticationError } = require('apollo-server-core');
 const jwt = require("jsonwebtoken")
 
 
 const Mutation = {
-    register: async (_, { content }, {User}) => {
-        let { email } = content
+    async register(_, { content }, { User }) {
+        let { email, name } = content
         try {
 
             let user = await User.findOne({ email })
@@ -16,12 +16,14 @@ const Mutation = {
             let payload = {
                 user: {
                     id: user._id,
-                    email
+                    email,
+                    name,
+                    role: user.role
                 }
             }
 
-            let accessToken = await jwt.sign(payload, process.env.ACCESS_TOKEN,{expiresIn :"2m"})
-            const refreshToken = await jwt.sign(payload, process.env.REFRESH_TOKEN,{expiresIn :"30m"})
+            let accessToken = jwt.sign(payload, process.env.ACCESS_TOKEN, { expiresIn: "10m" })
+            const refreshToken = jwt.sign(payload, process.env.REFRESH_TOKEN, { expiresIn: "2h" })
 
             accessToken = `Bearer ${accessToken}`
             user = await User.findOne({ email }).select('-password')
@@ -59,49 +61,56 @@ const Mutation = {
 
     },
     uploadFile: async (_, { file }) => {
-        console.log(file);
-        const { createReadStream, filename, mimetype, encoding } = await file
-        // console.log(filename);
-        // console.log("mimetype", mimetype);
-        // console.log("encoding",encoding);
+        try {
+            console.log(file);
+            if (!file) throw new UserInputError("file not sent", 400)
+            const { createReadStream, filename, mimetype, encoding } = await file
+            // console.log(filename);
+            // console.log("mimetype", mimetype);
+            // console.log("encoding",encoding);
 
-        // const { ext, name } = parse(filename)
-        // console.log("ext", ext);
-        // console.log("name", name);
+            // const { ext, name } = parse(filename)
+            // console.log("ext", ext);
+            // console.log("name", name);
 
-        // let fullName = filename.split(" ").join("") 
-        // console.log(fullName);
-
-
-        const stream = createReadStream();
-
-        //default  this stores it as a text with binary 
-        // const out = require('fs').createWriteStream('local-file-output.txt');
+            // let fullName = filename.split(" ").join("") 
+            // console.log(fullName);
 
 
-        //where i want to store the picture itself in a folder
-        // let store  =  join(__dirname, `../Upload/${filename}`);
-        // const out = require('fs').createWriteStream(store);
+            const stream = createReadStream();
+
+            //default  this stores it as a text with binary 
+            // const out = require('fs').createWriteStream('local-file-output.txt');
 
 
-        //where i want to store the text itself in a folder
-        // let store  =  join(__dirname, `../Upload/`);
-        // const out = require('fs').createWriteStream(`${store}local-file-output.txt`);
-
-        //file link
-        let serverFile = join(__dirname, `../Upload/-${Date.now()}${filename.split(" ").join("")}`);
-        const out = require('fs').createWriteStream(serverFile);
+            //where i want to store the picture itself in a folder
+            // let store  =  join(__dirname, `../Upload/${filename}`);
+            // const out = require('fs').createWriteStream(store);
 
 
-        stream.pipe(out);
-        await finished(out);
+            //where i want to store the text itself in a folder
+            // let store  =  join(__dirname, `../Upload/`);
+            // const out = require('fs').createWriteStream(`${store}local-file-output.txt`);
 
-        // console.log(serverFile);
-        serverFile = `${process.env.URL}${serverFile.split("Upload")[1]}`
-        console.log(serverFile);
-        console.log(process.env.URL);
+            //file link
+            let serverFile = join(__dirname, `../Upload/-${Date.now()}${filename.split(" ").join("")}`);
+            const out = require('fs').createWriteStream(serverFile);
 
-        return { filename, mimetype, encoding, link: serverFile };
+
+            stream.pipe(out);
+            await finished(out);
+
+            // console.log(serverFile);
+            serverFile = `${process.env.URL}${serverFile.split("Upload")[1]}`
+            console.log(serverFile);
+            console.log(process.env.URL);
+
+            return { filename, mimetype, encoding, link: serverFile };
+        } catch (error) {
+            throw new ApolloError(error.message, 500)
+
+        }
+
 
     },
     updateBook(_, args, ctx) {
@@ -135,6 +144,126 @@ const Mutation = {
             success: true,
             message: "successfully deleted",
             books: result
+        }
+    },
+    async createPost(_, { content }, { Post, user}) {
+        try {
+
+            if (!user) throw new AuthenticationError("User is not authenticated")
+
+            let { text } = content
+            if (!text) throw new UserInputError("Text field is Invalid")
+            let newPost = {
+                name: user.name,
+                user: user.id,
+                text
+            }
+
+             await Post.create(newPost)
+
+            // pubsub.publish('POST_CREATED', { postCreated: args }); 
+            // pubsub.publish('POST_CREATED', {
+            //     postCreated: post
+            //   });
+
+            let posts = await Post.find({ user: user.id })
+            return posts
+        } catch (error) {
+            throw new ApolloError(error.message, 500)
+
+        }
+
+
+    },
+    async addComment(_, { id, content }, { Post, user }) {
+        try {
+
+            if (!user) throw new AuthenticationError("User is not authenticated")
+
+            let post = await Post.findById(id)
+            if (!post) throw new Error("post does not exist")
+
+            // adding comment
+            let { text } = content
+            let comment = {
+                user: user.id,
+                text,
+                name: user.name,
+
+            }
+            post.comments.unshift(comment)
+
+            await post.save()
+
+            let posts = await Post.find({ user: user.id })
+            return posts
+
+        } catch (error) {
+            throw new ApolloError(error.message, 500)
+
+        }
+
+    },
+    async likePost(_, { id }, { Post, user }) {
+        try {
+            if (!user) throw new AuthenticationError("User is not authenticated")
+
+            let post = await Post.findById(id)
+            if (!post) throw new Error("post does not exist")
+
+            //liking and unliking
+            const like = post.likes.find(likes => likes.user.toString() === user.id)
+            if (!like) {
+                post.likes.unshift({ user: user.id })
+                await post.save()
+                // console.log(post.likes)
+            } else {
+                const findIndex = post.likes.findIndex(likes => likes.user.toString() === user.id)
+                // console.log(findIndex)
+                post.likes.splice(findIndex, 1)
+                await post.save()
+
+            }
+
+            let posts = await Post.find({ user: user.id })
+            return posts
+
+        } catch (error) {
+            throw new ApolloError(error.message, 500)
+
+        }
+
+    },
+    async deleteComment(_, { post_id, comment_id }, { Post, user, User }) {
+
+        try {
+            if (!user) throw new AuthenticationError("User is not authenticated")
+
+            let post = await Post.findById(post_id)
+            // console.log('post', post)
+
+            const comment = post.comments.find(comment => comment.id === comment_id)
+            // console.log('comment', comment) 
+
+            if (!comment) throw new Error("comment does not exist")
+
+            // check if comment is owned by the user
+            let role = await User.findById(user.id)
+
+            if (comment.user.toString() !== user.id || role.role !== 'ADMIN') throw new ForbiddenError("User is not authorized to delete")
+
+            const findIndex = post.comments.findIndex(comment => comment.id === comment_id)
+            // console.log('findIndex', findIndex)
+            post.comments.splice(findIndex, 1)
+            await post.save()
+            let posts = await Post.find({ user: user.id })
+            return posts
+
+
+
+        } catch (error) {
+            throw new ApolloError(error.message, 500)
+
         }
     }
 }

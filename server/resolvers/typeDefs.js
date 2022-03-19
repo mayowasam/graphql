@@ -1,10 +1,12 @@
 const { gql } = require('apollo-server-express');
-const {GraphQLScalarType, Kind} = require('graphql')
+const { GraphQLScalarType, Kind } = require('graphql')
 
 
 const typeDefs = gql`
-   directive @auth on FIELD_DEFINITION
-  #  directive @auth on FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_FIELD_DEFINITION | ENUM_VALUE
+    directive @permit(requires: Role = ADMIN) on OBJECT | FIELD_DEFINITION
+    directive @auth on OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_FIELD_DEFINITION | ENUM_VALUE
+    directive @deprecated(reason: String = "No longer supported") on FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_FIELD_DEFINITION | ENUM_VALUE
+    # directive @skip(if: Boolean) on FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_FIELD_DEFINITION | ENUM_VALUE
 
   scalar Upload
   scalar Date
@@ -74,7 +76,7 @@ type Response {
 }
 
 type Query {
-  books: Response @auth
+  books: Response @auth @permit(requires:USER)
   recognized:[Recognized]
   unrecognized:[UnRecognized]
   authors: [Author]
@@ -93,13 +95,15 @@ type Query {
     updateBook(title:String!, content: BookInput): [Book]
 
   }
+
+  
 `
 
 const dateScalar = new GraphQLScalarType({
   name: 'Date',
   description: 'Date custom scalar type',
   serialize(value) {
-      // console.log(value.getTime());
+    // console.log(value.getTime());
     return value.getTime(); // Convert outgoing Date to integer for JSON
   },
   parseValue(value) {

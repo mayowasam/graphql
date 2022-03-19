@@ -2,16 +2,32 @@ const { gql } = require('apollo-server-express');
 
 const userTypeDefs = gql`
 
+enum Role {
+  ADMIN
+  REVIEWER
+  USER
+  UNKNOWN
+}
+
 
 interface Params {
     email: String
 }
+
+
+# type User @permit(requires: USER) {
+#   name: String
+#   banned: Boolean @permit(requires: ADMIN)
+#   canPost: Boolean @permit(requires: REVIEWER)
+# }
 
 type User implements Params {
     id:ID
     name: String 
     age: String
     email: String
+    role: Role
+    # role: Role 
 }
 
 input LoginInput {
@@ -38,7 +54,8 @@ type UserResponse {
 
 extend type Query {
     login(content: LoginInput): UserResponse
- 
+    getUser: User @auth 
+    refreshToken: String
   }
 
  
